@@ -5,6 +5,8 @@ import compress from "compression";
 import cors from "cors";
 import helmet from "helmet";
 
+import Template from './../template.js';
+
 const app = express();
 /*... configure express ... */
 app.use(bodyParser.json());
@@ -13,5 +15,9 @@ app.use(cookieParser());
 app.use(compress());
 app.use(helmet());
 app.use(cors());
+
+app.get('/', (request, response) => { 
+  response.status(200).send(Template());
+ });
 
 export default app;

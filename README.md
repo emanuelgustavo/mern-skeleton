@@ -263,6 +263,205 @@ Estamos importando as variáveis configuradas em `/config/config.js` e passando 
 Antes de continuar, vamos verificar se o código está rodando executando no terminal dentro da pasta do projeto `$npm run development`. Se rodar sem aparecer erros, estamos no caminho certo.
 
 
+### COnfigurando e conectando o banco de dados MongoDB
 
+Certifique-se de ter o MongoDB instalado em sua máquina. Se não, [clica aqui!](https://docs.mongodb.com/manual/installation/)
+
+Vamos utilizar o [Mongoose](https://mongoosejs.com/) para implementar o user Model e também todas as features de modelagem de dados para nossa aplicação. 
+
+Vamos iniciar instalando e configurando o `Mongoose`:
+
+`$yarn add mongoose`
+
+Agora, vamos configurar o `Mongoose` dentro do arquivo `server/server.js`:
+
+```javascript
+import mongoose from 'mongoose'
+
+mongoose.Promise = global.Promise
+mongoose.connect(config.mongoUri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+});
+
+mongoose.connection.on('error', () => {
+  throw new Error(`unable to connect to database: ${mongoUri}`)
+})
+```
+
+Reinicie o servidor para integrar o Mongoose ao MongoDB.
+
+### Servindo um template HTML como uma URL root
+
+Agora que configuramos o Node, Express e MongoDB como um servidor rodando, vamos configurar uma página para responder a requisição a URL root "/".
+
+Dentro da pasta raiz do projeto vamos criar um arquivo com o nome de `template.js` e colocar o seguinte código:
+
+```javascript
+export default () => {
+    return `<!doctype html>
+      <html lang="en">
+          <head>
+             <meta charset="utf-8">
+             <title>MERN Skeleton</title>
+          </head>
+          <body>
+            <div id="root">Hello World</div>
+          </body>
+      </html>`
+}
+```
+
+Vamos mostrar ao servidor o que fazer quando ele receber uma requisição GET para a url root. No arquivo `server/express.js` vamos colocar o seguinte código:
+
+```javascript
+import Template from './../template'
+...
+app.get('/', (req, res) => {
+  res.status(200).send(Template())
+})
+...
+```
+
+Agora, quando acessamos a URL root, vemos renderizado na página a mensagem "Hello World".
+
+### User model
+
+Vamos implementar o modelos de usuário usando o Mongoose para definir o schema com os campos de dados necessários, adicionar validação para o campos, definir a lógica das regras de negócio bem como incorporar uma senha encriptada para validação e autenticação.
+
+Vamos criar um arquivo `/server/models/user.model.js` e através do mongoose gerar o UserSchema:
+
+```javascript
+import mongoose from 'mongoose'
+
+const UserSchema = new mongoose.Schema({ … })
+```
+
+### Definindo o UserSchema
+
+Vamos adicinar os campos e suas propriedades ao UserSchema:
+
+```javascript
+...
+
+const UserSchema = new mongoose.Schema({ 
+  name: {
+   type: String,
+   trim: true,
+   required: 'Name is required'
+  },
+  email: {
+    type: String,
+    trim: true,
+    unique: 'Email already exists',
+    match: [/.+\@.+\..+/, 'Please fill a valid email address'],
+    required: 'Email is required'
+  },
+  created: {
+    type: Date,
+    default: Date.now
+  },
+  updated: Date,
+  hashed_password: {
+      type: String,
+      required: "Password is required"
+  },
+  salt: String,
+  UserSchema
+    .virtual('password')
+    .set(function(password) {
+      this._password = password
+      this.salt = this.makeSalt()
+      this.hashed_password = this.encryptPassword(password)
+    })
+    .get(function() {
+      return this._password
+    })
+  })
+```
+
+Vamos adiciona também alguns métodos:
+
+```javascript
+UserSchema.methods = {
+
+  authenticate: function(plainText) {
+      return this.encryptPassword(plainText) === this.hashed_password
+    },
+
+  encryptPassword: function(password) {
+      if (!password) return ''
+      try {
+        return crypto
+          .createHmac('sha1', this.salt)
+          .update(password)
+          .digest('hex')
+      } catch (err) {
+        return ''
+      }
+    },
+
+  makeSalt: function() {
+      return Math.round((new Date().valueOf() * Math.random())) + ''
+    }
+    
+}
+
+UserSchema.path('hashed_password').validate(function(v) {
+
+  if (this._password && this._password.length < 6) {
+    this.invalidate('password', 'Password must be at least 6 characters.')
+  }
+  if (this.isNew && !this._password) {
+    this.invalidate('password', 'Password is required')
+  }
+
+}, null)
+
+export default mongoose.model('User', UserSchema) 
+
+```
+
+### Lidando com erros Mongoose
+
+Vamos criar o arquivo `/server/helpers/dbErrorHandler.js` e adicionar o seguinte código:
+
+```javascript
+const getErrorMessage = (err) => {
+  let message = ''
+  if (err.code) {
+      switch (err.code) {
+          case 11000:
+          case 11001:
+              message = getUniqueErrorMessage(err)
+              break
+          default:
+              message = 'Something went wrong'
+      }
+  } else {
+      for (let errName in err.errors) {
+          if (err.errors[errName].message)
+          message = err.errors[errName].message
+      }
+  }
+  return message
+}
+
+const getUniqueErrorMessage = (err) => {
+  let output
+  try {
+      let fieldName =   
+      err.message.substring(err.message.lastIndexOf('.$') + 2,                                             
+      err.message.lastIndexOf('_1'))
+      output = fieldName.charAt(0).toUpperCase() + fieldName.slice(1) +   
+      ' already exists'
+  } catch (ex) {
+      output = 'Unique field already exists'
+  }
+  return output
+}
+
+export default {getErrorMessage}
+```
 
 
