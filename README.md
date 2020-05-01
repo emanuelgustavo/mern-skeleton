@@ -464,4 +464,250 @@ const getUniqueErrorMessage = (err) => {
 export default {getErrorMessage}
 ```
 
+## User CRUD API
 
+Os endpoints expostos pelo Expresse permitirão ao frontend usar as operações CRUD nos documento gerados no banco de dados de acordo com o user model.
+
+Para implementar os endpoints, vamos implementar rotas Express correspondentes e ligá-las ao controller correspondente onde funcões callbak serão executadas quando as requisições HTTP chegarem a essas rotas.
+
+Vamos criar o arquivo `/server/routes/user.routes.js` e definir as rotas.
+
+### User routes
+
+Teremos duas rotas em nosso app:
+
+`/api/users` e o `/api/users/:userId`. 
+
+No primeiro iremos listar os usuários com o método GET e criar um novo usuário com o método POST. 
+
+No segundo, vamos fazer um fetching de um usuário com o método GET, atualizar com o método PUT e deletar com o método DELETE.
+
+Dentro do arquivo `server/express.js` vamos adicionar as seguintes linhas:
+
+```javascript
+import userRoutes from './routes/user.routes'
+...
+app.use('/', userRoutes)
+...
+```
+
+Vamos então criar o arquivo `server/routes/user.routes.js` e configirar as rotas como segue:
+
+```javascript
+import express from 'express'
+import userCtrl from '../controllers/user.controller'
+
+const router = express.Router()
+
+router.route('/api/users')
+  .get(userCtrl.list)
+  .post(userCtrl.create)
+
+router.route('/api/users/:userId')
+  .get(userCtrl.read)
+  .put(userCtrl.update)
+  .delete(userCtrl.remove)
+
+router.param('userId', userCtrl.userByID)
+
+export default router
+```
+
+### User Controller
+
+Vamos criar o arquivo `server/controllers/user.controller.js` que conterá os métodos do user controller que serão acessados a partir do user routes quando uma rota for requisitada pelo front-end.
+
+Vamos adicionar o seguinte código:
+
+```javascript
+import User from '../models/user.model'
+import _ from 'lodash'
+import errorHandler from './error.controller'
+
+const create = (req, res, next) => { … }
+const list = (req, res) => { … }
+const userByID = (req, res, next, id) => { … }
+const read = (req, res) => { … }
+const update = (req, res, next) => { … }
+const remove = (req, res, next) => { … }
+
+export default { create, userByID, read, list, remove, update }
+```
+
+O controller usará um `errorHandler` para ajudar a responder a rota erros ocorridos no Mongoose com mais significado. Para isso, vamos instalar o módulo chamado `loadsh` que é um biblioteca JavaScript.
+
+`$yarn add loadsh`
+
+Vamos agora configurar cada endpoint da API.
+
+### Criando um novo usuário
+
+O código abaixo que adicionamos dentro do arquivo `/server/routes/user.routes.js` indica a endpoint de criação de usuário:
+
+```javascript
+router.route('/api/users')
+  .post(userCtrl.create)
+```
+
+Quando o `app Express` recebe uma requisição com método POST em `'api/users'`, ele chama a função `create` definida no controller:
+
+Vamos atualizar o método create no arquivo `server/controllers/user.controller.js`:
+
+```javascript
+const create = (req, res, next) => {
+  const user = new User(req.body)
+  user.save((err, result) => {
+    if (err) {
+      return res.status(400).json({
+        error: errorHandler.getErrorMessage(err)
+      })
+    }
+    res.status(200).json({
+      message: "Successfully signed up!"
+    })
+  })
+}
+```
+
+Essa função cria um novo usuário com o usuário sendo passado atráves do body da requisição POST no formato JSON.
+
+### Listando todos os usuários
+
+O código abaixo que adicionamos dentro do arquivo `/server/routes/user.routes.js` indica a endpoint que lista todos os usuários:
+
+```javascript
+router.route('/api/users')
+  .get(userCtrl.list)
+```
+
+Vamos atualizar o método list no arquivo `server/controllers/user.controller.js`:
+
+```javascript
+const list = (req, res) => {
+  User.find((err, users) => {
+    if (err) {
+      return res.status(400).json({
+        error: errorHandler.getErrorMessage(err)
+      })
+    }
+    res.json(users)
+  }).select('name email updated created')
+}
+```
+
+Esse método busca todos os usuário e retorna os dados em formato JSON.
+
+###  Loading a user by ID to read, update, or delete
+
+Essas três endpoints da API requerem um id de usuário que será carregado antes do Express router responder a request respectiva para o read, update e delete.
+
+### Loading
+
+Sempre que o Express receber uma request que contém em seu path o parâmtro `:userId`, o app irá executar primeiro a função `userByID` dentro do controller antes de ir a próxima função com o `next`. 
+Para mais informações sobre o `Express router.param` [clique aqui](http://expressjs.com/en/5x/api.html#router.param).
+
+O código abaixo que adicionamos dentro do arquivo `/server/routes/user.routes.js` chama a função `userByID`:
+
+```javascript
+router.param('userId', userCtrl.userByID)
+```
+
+Vamos atualizar o método userByID no arquivo `server/controllers/user.controller.js`:
+
+```javascript
+const userByID = (req, res, next, id) => {
+  User.findById(id).exec((err, user) => {
+    if (err || !user)
+      return res.status('400').json({
+        error: "User not found"
+      })
+    req.profile = user
+    next()
+  })
+}
+```
+
+Se o usuário for encontrado no bando de dados um objeto é adicionado ao objeto da requisição dentro do `profile`. Então, atráves do `middleware` `netx()` o controle é propagado para a próxima função relevante no controller de acordo com o método HTTP solicitado na request.
+
+### Reading
+
+A endpoint da API que faz a leitura de um único usuário dentro do arquivo `/server/routes/user.routes.js` é:
+
+```javascript
+router.route('/api/users/:userId')
+  .get(userCtrl.read)
+```
+Vamos atualizar o método read no arquivo `server/controllers/user.controller.js`:
+
+```javascript
+const read = (req, res) => {
+  req.profile.hashed_password = undefined
+  req.profile.salt = undefined
+  return res.json(req.profile)
+}
+```
+
+Essa função remove as informações sensíveis do profile do usuário como a senha antes de retornar as informação no objeto response para o client.
+
+### Updating
+
+A endpoint da API que faz a atualização de um único usuário dentro do arquivo `/server/routes/user.routes.js` é:
+
+```javascript
+router.route('/api/users/:userId')
+  .put(userCtrl.update)
+```
+Vamos atualizar o método update no arquivo `server/controllers/user.controller.js`:
+
+```javascript
+const update = (req, res, next) => {
+  let user = req.profile
+  user = _.extend(user, req.body)
+  user.updated = Date.now()
+  user.save((err) => {
+    if (err) {
+      return res.status(400).json({
+        error: errorHandler.getErrorMessage(err)
+      })
+    }
+    user.hashed_password = undefined
+    user.salt = undefined
+    res.json(user)
+  })
+}
+```
+
+Essa função recebe os detalhes do usuário do `req.profile` então utiliza o `loadsh` para extender e fazer um merge dos dados alterados que vem atráves do body da requisição. Antes de salvar o usuário atualizado no banco de dados, o campo `updated` é atualizado com o data do momento da atualização. Novamente as informações sensíveis como a senha são removidos do objeto antes de enviar o objeto de response para o client.
+
+### Deleting
+
+A endpoint da API que exclui um único usuário dentro do arquivo `/server/routes/user.routes.js` é:
+
+```javascript
+router.route('/api/users/:userId')
+  .delete(userCtrl.remove)
+```
+Vamos atualizar o método remove no arquivo `server/controllers/user.controller.js`:
+
+```javascript
+const remove = (req, res, next) => {
+  let user = req.profile
+  user.remove((err, deletedUser) => {
+    if (err) {
+      return res.status(400).json({
+        error: errorHandler.getErrorMessage(err)
+      })
+    }
+    deletedUser.hashed_password = undefined
+    deletedUser.salt = undefined
+    res.json(deletedUser)
+  })
+}
+```
+
+Essa função recebe os detalhes do usuário do `req.profile` então utiliza o `remove()` para excluir do banco de dados o usuário. Novamente as informações sensíveis como a senha são removidos do objeto antes de enviar o objeto de response para o client.
+
+
+Agora é possível utilizar as operações de CRUD na aplicação.
+
+## User auth and protected routes
