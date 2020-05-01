@@ -6,6 +6,7 @@ import cors from "cors";
 import helmet from "helmet";
 
 import Template from './../template.js';
+import authRoutes from './routes/auth.routes.js';
 
 const app = express();
 /*... configure express ... */
@@ -16,8 +17,20 @@ app.use(compress());
 app.use(helmet());
 app.use(cors());
 
+/**use auth routes for restrict endpoint */
+app.use('/', authRoutes);
+
 app.get('/', (request, response) => { 
   response.status(200).send(Template());
- });
+});
+ 
+/**Auth error handling for express-jwt */
+app.use((error, req, res, next) => { 
+  if (error.name === 'UnauthorizedError') {
+    res.status(401).json({
+      'error': error.name + ': ' + error.message
+    });
+  }
+});
 
 export default app;

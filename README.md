@@ -711,3 +711,206 @@ Essa função recebe os detalhes do usuário do `req.profile` então utiliza o `
 Agora é possível utilizar as operações de CRUD na aplicação.
 
 ## User auth and protected routes
+
+Para restringir o acesso a operações de atualização e de remoção de um usuário, vamos implementar um sign-in autenticado com JWT, para as rotas de read, update e delete.
+
+O endpoint relacionado ao sign-in e sign-ou do app será implementado no arquivo que criamos em `server/routes/auth.routes.js` e depois configurado no `/server/express.js` da seguinte maneira:
+
+```javascript
+import authRoutes from './routes/auth.routes'
+  ...
+  app.use('/', authRoutes)
+  ...
+```
+
+### Auth routes
+
+Duas APIs de autenticação serão declaradas path de rotas com métodos HTTP atráves do `express.Routes()` chamando suas respectivas funções no `auth controller`:
+
+ - `'/auth/sigin'`: requisição autenticada com método POST que requer do usuário email e senha
+
+ - `'/auth/signout'`: requisição GET para limpar o cookie que contém o JWT que foi armazenado como objeto da resposta do sign-in
+
+ Vamos adicionar essas rotas ao `server/routes/auth.routes.js`:
+
+ ```javascript
+import express from 'express'
+import authCtrl from '../controllers/auth.controller'
+
+const router = express.Router()
+
+router.route('/auth/signin')
+  .post(authCtrl.signin)
+router.route('/auth/signout')
+  .get(authCtrl.signout)
+
+export default router
+```
+
+### Auth controller
+
+O `auth controller` terá funções que além de lidar com as requisições de sign-in e sign-ou também irão fornecer o JWT e funcionalidade `express-jwt` que irão habilitar a autenticação e autorização do usuário a endpoint protegidas da API.
+
+Vamos instalar o `jsonwebtoken`:
+
+`$yarn add jsonwebtoken`
+
+Vamos criar o arquivo `/server/controllers/auth.controller.js` e digitar o seguinte código:
+
+ ```javascript
+import User from '../models/user.model'
+import jwt from 'jsonwebtoken'
+import expressJwt from 'express-jwt'
+import config from './../../config/config'
+
+const signin = (req, res) => { … }
+const signout = (req, res) => { … }
+const requireSignin = … 
+const hasAuthorization = (req, res) => { … }
+
+export default { signin, signout, requireSignin, hasAuthorization }
+```
+
+Essa quatro funções mostram como o backend implementa uma autenticação de usuário usando JSON Web Tokens (JWT). Vamos implementá-las a seguir:
+
+### Sign-in
+
+A endpoint da API que faz o sign-in do usuário dentro do arquivo `/server/routes/auth.routes.js` é:
+
+```javascript
+router.route('/auth/signin')
+  .post(authCtrl.signin)
+```
+Vamos atualizar o método sigin no arquivo `server/controllers/auth.controller.js`:
+
+```javascript
+const signin = (req, res) => {
+  User.findOne({
+    "email": req.body.email
+  }, (err, user) => {
+    if (err || !user)
+      return res.status('401').json({
+        error: "User not found"
+      })
+
+    if (!user.authenticate(req.body.password)) {
+      return res.status('401').send({
+        error: "Email and password don't match."
+      })
+    }
+
+    const token = jwt.sign({
+      _id: user._id
+    }, config.jwtSecret)
+
+    res.cookie("t", token, {
+      expire: new Date() + 9999
+    })
+
+    return res.json({
+      token,
+      user: {_id: user._id, name: user.name, email: user.email}
+    })
+  })
+}
+```
+
+A requisição POST recebe um email e uma password no `req.body`, que são usados para verificar se o usuário existe no bando de dados. Então, se o usuário exite, o módulo JWT é usado para gerar um JWT usando uma chave secreta e o `_id` do usuário. Então, o JWT é retornado junto com os detalhes do usuário para o client agora autenticado. Opcionalmente, podemos também definir o token para um cookie no objeto resposta então ele estará disponivel para o client side se os cookies foram escolhidos como forma de armazenar o JWT. No client side, sempre que for feita uma requisição ao server-side para rotas protegidas, o token deve ser anexado com uma `Authorization` no header.
+
+### Sign-out
+
+A endpoint da API que faz o sign-out do usuário dentro do arquivo `/server/routes/auth.routes.js` é:
+
+```javascript
+router.route('/auth/signout')
+  .get(authCtrl.signout)
+```
+Vamos atualizar o método signout no arquivo `server/controllers/auth.controller.js`:
+
+```javascript
+const signout = (req, res) => {
+  res.clearCookie("t")
+  return res.status('200').json({
+    message: "signed out"
+  })
+}
+```
+
+Essa função limpa o cookie que contém o JWT. O client precisa excluir o token no client-side para que o usuário não esteja mais autenticado.
+
+## Protecting routes with express-jwt
+
+Para acessar as funções de read, uptade e delete, o servidor precisa se certificar que o usuário que está fazendo a requisição está autenticado e autorizado. Para isso vamos usar o módulo `express-jwt`.
+
+Vamos instalar o `express-jwt`:
+
+`$yarn add express-jwt`
+
+### Requiring sign-in
+
+Dentro do `auth.controller.js`, o método `requireSignin` usa o `express-jwt` para verificar se a requisição tem um JWT válido no `Authorization` do header. Se sim, ele adiciona uma chave 'auth' ao objeto da requisição do usuário, senão dispara um erro.
+
+No arquivo `/server/controllers/auth.controller.js` vamos digitar o seguinte código:
+
+```javascript
+const requireSignin = expressJwt({
+  secret: config.jwtSecret,
+  userProperty: 'auth'
+})
+```
+
+Podemos adicionar o método `requireSignin` a qualquer rota que queremos proteger contra acessos sem autenticação.
+
+### Authorizing signed in users
+
+Para algumas rotas protegidas como update e delete, além de verificar se o usuário está autenticado, vamos verificar se ele está autorizado a realizar esses procedimentos, no caso deste app, o único usuário que poderá atualizar ou excluir seu perfil é o dono do perfil. Para fazer isso, a função `hasAuthorization` checa se o usuário autenticado é o mesmo.
+
+No arquivo `/server/controllers/auth.controller.js` vamos digitar o seguinte código:
+
+```javascript
+const hasAuthorization = (req, res, next) => {
+  const authorized = req.profile && req.auth && req.profile._id == 
+  req.auth._id
+  if (!(authorized)) {
+    return res.status('403').json({
+      error: "User is not authorized"
+    })
+  }
+  next()
+}
+```
+
+### Protecting user routes
+
+Nós iremos adicionar `requireSignin` e `hasAuthorization` as rotas onde é necessário que o usuário seja autenticado e autorizado. Vamos incluir dentro das rotas no arquivo `server/routes/user.routes.js` como segue:
+
+```javascript
+import authCtrl from '../controllers/auth.controller'
+...
+router.route('/api/users/:userId')
+    .get(authCtrl.requireSignin, userCtrl.read)
+    .put(authCtrl.requireSignin, authCtrl.hasAuthorization, 
+     userCtrl.update)
+    .delete(authCtrl.requireSignin, authCtrl.hasAuthorization, 
+     userCtrl.remove)
+...
+```
+
+## Auth error handling for express-jwt
+
+Para lidar com error gerados pelo `express-jwt` quando ele tenta validar um token JWT nós precisamos adicionar o seguinte capturador de error no app Express no arquivo: `/server/express.js`:
+
+```javascript
+app.use((err, req, res, next) => {
+  if (err.name === 'UnauthorizedError') {
+    res.status(401).json({"error" : err.name + ": " + err.message})
+  }
+})
+```
+
+Esse código precisa ser implementado no fim do código e antes do app ser exportado.
+
+O `express-jwt` lança um erro chamado `UnauthorizedError` quando o token não pode ser validado por qualquer razão. Nós capturamos esse erro e retornamos ao client o seu status.
+
+Com isso, finalizamos todas as features necessárias para que o backend do MERN funcione.
+
