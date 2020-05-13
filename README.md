@@ -171,10 +171,12 @@ const config = {
 export default config
 ```
 
-`env` se é para diferenciar entre modo de desenvolvimento ou produção
-`port` define qual porta o servidor irá "ouvir"
-`jwtSecret` é a chave secreta para assinar o JWT
-`mongoUri` é o local do banco de dados Mongo para esse projeto
+ - `env` se é para diferenciar entre modo de desenvolvimento ou produção
+ - `port` define qual porta o servidor irá "ouvir"
+ - `jwtSecret` é a chave secreta para assinar o JWT
+ - `mongoUri` é o local do banco de dados Mongo para esse projeto
+ 
+ Para saber mais sobre variáveis de ambiente no Nodejs consulte [Working with Environment Variables in Node.js](https://www.twilio.com/blog/working-with-environment-variables-in-node-js-html)
 
 ### Scripts para rodar
 
