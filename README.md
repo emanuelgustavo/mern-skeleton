@@ -1,6 +1,18 @@
 # mern-skeleton
 My mern-skeleton coded
 
+# Disclaimer:
+
+Este conteúdo foi extraido do livro Full Stack React Project, disponível gratuitamente no [packtpub.com](packtpub.com), e faz parte
+dos meus estudos sobre essa stack baseada na linguagem JavaScript.
+
+A sigla MERN vem de:
+
+- M => MongoDB
+- E => Express
+- R => React
+- N => Nodejs
+
 Abaixo, o passo a passo para configurar um ambiente e um mockup de uma aplicação com a stack MERN.
 
 ## Implementando o Back-End
@@ -10,8 +22,6 @@ Para implementar o back-end, vamos começar definindo a estrutura de arquivos e 
 Vamos definir o user model, as API endpoints e o a autenticação baseada em JWT.
 
 ## Estrutura de pastas e arquivos:
-
-### Extraído do livro Full-Stack React Projects:
 
 ```
 | mern_skeleton/
@@ -910,7 +920,7 @@ app.use((err, req, res, next) => {
 })
 ```
 
-Esse código precisa ser implementado no fim do código e antes do app ser exportado.
+Esse trecho precisa ser implementado no fim do código e antes do app ser exportado.
 
 O `express-jwt` lança um erro chamado `UnauthorizedError` quando o token não pode ser validado por qualquer razão. Nós capturamos esse erro e retornamos ao client o seu status.
 

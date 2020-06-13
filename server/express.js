@@ -21,15 +21,19 @@ app.use(cors());
 app.use('/', authRoutes);
 
 app.get('/', (request, response) => { 
-  response.status(200).send(Template());
+  response
+    .status(200)
+    .send(Template());
 });
  
 /**Auth error handling for express-jwt */
 app.use((error, req, res, next) => { 
   if (error.name === 'UnauthorizedError') {
-    res.status(401).json({
-      'error': error.name + ': ' + error.message
-    });
+    res
+      .status(401)
+      .json({
+        'error': error.name + ': ' + error.message
+      });
   }
 });
 

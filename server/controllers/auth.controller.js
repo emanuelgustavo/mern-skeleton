@@ -2,7 +2,6 @@ import User from '../models/user.model.js';
 import jwt from 'jsonwebtoken';
 import expressJwt from 'express-jwt';
 import config from './../../config/config.js';
-import webpackNodeExternals from 'webpack-node-externals';
 
 const signin = (req, res) => {
   User.findOne({
