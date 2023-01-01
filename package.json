@@ -31,10 +31,10 @@
         "@babel/core": "^7.9.0",
         "@babel/preset-env": "^7.9.5",
         "@babel/preset-react": "^7.9.4",
-        "babel-loader": "^8.1.0",
+        "babel-loader": "^8.3.0",
         "nodemon": "^2.0.3",
-        "webpack": "^4.43.0",
-        "webpack-cli": "^3.3.11",
+        "webpack": "^5.75.0",
+        "webpack-cli": "^5.0.1",
         "webpack-dev-middleware": "^3.7.2",
         "webpack-hot-middleware": "^2.25.0",
         "webpack-node-externals": "^1.7.2"
@@ -50,6 +50,6 @@
         "jsonwebtoken": "^8.5.1",
         "loadsh": "^0.0.4",
         "mongoose": "^5.9.10",
-        "react-hot-loader": "^4.12.20"
+        "react-hot-loader": "^4.13.1"
     }
 }
